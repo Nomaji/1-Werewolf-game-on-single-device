@@ -3,111 +3,632 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Werewolf - 対面人狼</title>
+    <title>本格対面人狼</title>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: #eee; text-align: center; padding: 20px; }
-        .card { background: #333; border-radius: 10px; padding: 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        button { background: #4a90e2; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 5px; }
-        input { padding: 10px; border-radius: 5px; border: none; margin-bottom: 10px; width: 80%; }
+        body { font-family: sans-serif; background: #121212; color: #fff; text-align: center; padding: 10px; }
+        .card { background: #2a2a2a; border-radius: 10px; padding: 20px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.8); }
+        button { background: #e74c3c; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 5px; width: 90%; max-width: 300px; }
+        button.btn-blue { background: #3498db; }
+        button.btn-green { background: #2ecc71; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        input, select { padding: 10px; border-radius: 5px; border: none; margin-bottom: 10px; width: 80%; font-size: 16px; }
+        .hidden { display: none !important; }
         ul { list-style: none; padding: 0; }
-        .hidden { display: none; }
-        .danger { background: #e74c3c; }
+        li { margin: 5px 0; font-size: 18px; }
+        .role-control { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding: 5px; background: #333; }
+        .role-control button { width: 40px; margin: 0; padding: 5px; }
+        .timer-text { font-size: 24px; font-weight: bold; color: #f1c40f; }
+        .red { color: #e74c3c; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>🐺 対面人狼</h1>
+    <h1>🐺 本格対面人狼</h1>
 
     <div id="game-container" class="card">
         <div id="setup-screen">
             <h3>プレイヤー登録</h3>
             <input type="text" id="player-name" placeholder="名前を入力">
-            <button onclick="addPlayer()">追加</button>
+            <button onclick="addPlayer()" class="btn-blue">追加</button>
             <ul id="player-list"></ul>
-            <button onclick="startGame()" class="danger">ゲーム開始</button>
+            <button onclick="goToRoleSetup()" class="btn-green" id="btn-to-role" disabled>役職設定へ (0人)</button>
+        </div>
+
+        <div id="role-setup-screen" class="hidden">
+            <h3>役職設定</h3>
+            <p>合計: <span id="role-total-count">0</span> / <span id="player-total-count">0</span> 人</p>
+            <div id="role-controls"></div>
+            <button onclick="startGame()" class="btn-green" id="btn-start-game" disabled>ゲームスタート</button>
+        </div>
+
+        <div id="interlude-screen" class="hidden">
+            <h2 id="interlude-text"></h2>
+            <p>周囲の人に見られないように気をつけてください。</p>
+            <button onclick="showRoleOrAction()">はい、私です</button>
         </div>
 
         <div id="role-confirm-screen" class="hidden">
-            <h2 id="current-player-display"></h2>
-            <p>準備ができたらボタンを押してください</p>
-            <button onclick="showRole()">役職を見る</button>
-        </div>
-
-        <div id="role-reveal-screen" class="hidden">
             <h2 id="role-display"></h2>
-            <p id="role-desc"></p>
-            <button onclick="nextPlayer()">確認しました</button>
+            <div id="role-info" style="margin: 15px 0; font-size: 18px;"></div>
+            <div id="junai-action" class="hidden">
+                <p>愛する人を選んでください:</p>
+                <select id="junai-target"></select>
+                <button onclick="decideJunai()" class="btn-blue" style="width: auto;">決定</button>
+            </div>
+            <div class="timer-text"><span id="confirm-timer">15</span> 秒後に自動で閉じます</div>
+            <button onclick="nextPlayerConfirm()" class="btn-blue">スキップ (確認完了)</button>
         </div>
 
-        <div id="action-screen" class="hidden">
-            <h2 id="phase-title">夜のフェーズ</h2>
-            <div id="action-log"></div>
-            <button onclick="endTurn()" id="phase-btn">次の日へ</button>
+        <div id="day-discuss-screen" class="hidden">
+            <h2 id="day-title"></h2>
+            <div id="morning-news" style="margin-bottom: 15px; font-size: 18px;" class="red"></div>
+            <p>話し合いを始めてください。</p>
+            <div class="timer-text" id="discuss-timer-display">300</div>
+            <button onclick="extendTime()" class="btn-blue" id="btn-extend">延長 (+120秒) 残り<span id="extend-count">5</span>回</button>
+            <button onclick="endDiscussion()">議論終了 (投票へ)</button>
+        </div>
+
+        <div id="vote-select-screen" class="hidden">
+            <h3>投票の時間です</h3>
+            <button onclick="startVote('all')" class="btn-blue">満場一致で処刑する人を決める</button>
+            <button onclick="startVote('individual')" class="btn-blue">一人一人投票する</button>
+        </div>
+
+        <div id="vote-all-screen" class="hidden">
+            <h3>処刑する人を選んでください</h3>
+            <select id="vote-all-target"></select>
+            <button onclick="executeVoteAll()">決定</button>
+        </div>
+
+        <div id="vote-indiv-screen" class="hidden">
+            <h3 id="vote-indiv-name"></h3>
+            <p>処刑したい人を選んでください</p>
+            <select id="vote-indiv-target"></select>
+            <button onclick="nextVoteIndiv()">投票する</button>
+        </div>
+
+        <div id="night-action-screen" class="hidden">
+            <h2 id="night-action-name"></h2>
+            <div id="night-action-desc" style="margin-bottom: 15px;"></div>
+            <select id="night-action-target" class="hidden"></select>
+            <button onclick="nextNightAction()" class="btn-blue">行動を決定する / 待機</button>
+        </div>
+
+        <div id="result-screen" class="hidden">
+            <h1 id="winner-text" class="red"></h1>
+            <ul id="extra-winners" style="color: #f1c40f; font-weight: bold;"></ul>
+            <div id="all-roles" style="text-align: left; margin-top: 20px; font-size: 14px;"></div>
         </div>
     </div>
 
     <script>
+        // --- 役職データ定義 ---
+        const ROLE_DEFS = {
+            "市民": { team: "citizen", count: "citizen", divine: "市民" },
+            "占い師": { team: "citizen", count: "citizen", divine: "市民" },
+            "霊能者": { team: "citizen", count: "citizen", divine: "市民" },
+            "狩人": { team: "citizen", count: "citizen", divine: "市民" },
+            "パン屋": { team: "citizen", count: "citizen", divine: "市民" },
+            "猫又": { team: "citizen", count: "citizen", divine: "市民" },
+            "狂人": { team: "wolf", count: "citizen", divine: "市民" },
+            "狂信者": { team: "wolf", count: "citizen", divine: "市民" },
+            "黒猫": { team: "wolf", count: "citizen", divine: "市民" },
+            "人狼": { team: "wolf", count: "wolf", divine: "人狼" },
+            "てるてる坊主": { team: "other", count: "citizen", divine: "市民" },
+            "純愛者": { team: "other", count: "citizen", divine: "市民" },
+            "妖狐": { team: "fox", count: "none", divine: "市民" }
+        };
+
+        // --- グローバル変数 ---
         let players = [];
-        let currentIndex = 0;
-        const roles = ["人狼", "占い師", "村人", "村人", "村人"]; // 人数に合わせて調整
+        let roleCounts = {};
+        let day = 1;
+        let phase = ""; // confirm, night, discuss, vote
+        let currentPlayerIndex = 0;
+        let timerInterval = null;
+        let confirmTimeLeft = 15;
+        let discussTimeLeft = 300;
+        let extendLeft = 5;
+        
+        let initDivinedTarget = null; // 初日占い先
+        let bakeryAliveLastNight = true; // 前夜のパン屋生存フラグ
+        let executedToday = null; // 本日処刑された人
+
+        let votes = {};
+        let nightActions = { attack: null, guard: null, divine: null };
+
+        // --- 初期化・UI遷移 ---
+        function showScreen(id) {
+            document.querySelectorAll('#game-container > div').forEach(div => div.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
 
         function addPlayer() {
-            const input = document.getElementById('player-name');
-            if (input.value) {
-                players.push({ name: input.value, role: '', alive: true });
+            const nameInput = document.getElementById('player-name');
+            const name = nameInput.value.trim();
+            if (name && !players.find(p => p.name === name)) {
+                players.push({ name, role: '', alive: true, lovedBy: null, deadReason: null, isTeruteruWon: false });
                 const li = document.createElement('li');
-                li.textContent = input.value;
+                li.textContent = name;
                 document.getElementById('player-list').appendChild(li);
-                input.value = '';
+                nameInput.value = '';
+                
+                document.getElementById('btn-to-role').textContent = `役職設定へ (${players.length}人)`;
+                document.getElementById('btn-to-role').disabled = players.length < 3;
             }
+        }
+
+        function goToRoleSetup() {
+            const container = document.getElementById('role-controls');
+            container.innerHTML = '';
+            Object.keys(ROLE_DEFS).forEach(role => {
+                roleCounts[role] = 0;
+                const div = document.createElement('div');
+                div.className = 'role-control';
+                div.innerHTML = `
+                    <span>${role}</span>
+                    <div>
+                        <button onclick="changeRoleCount('${role}', -1)">-</button>
+                        <span id="count-${role}" style="display:inline-block; width:20px;">0</span>
+                        <button onclick="changeRoleCount('${role}', 1)">+</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            document.getElementById('player-total-count').textContent = players.length;
+            showScreen('role-setup-screen');
+        }
+
+        function changeRoleCount(role, delta) {
+            const newCount = roleCounts[role] + delta;
+            if (newCount >= 0) {
+                roleCounts[role] = newCount;
+                document.getElementById(`count-${role}`).textContent = newCount;
+                updateRoleTotal();
+            }
+        }
+
+        function updateRoleTotal() {
+            const total = Object.values(roleCounts).reduce((a, b) => a + b, 0);
+            document.getElementById('role-total-count').textContent = total;
+            document.getElementById('btn-start-game').disabled = total !== players.length;
         }
 
         function startGame() {
-            if (players.length < 3) return alert("3人以上必要です");
-            
-            // 役職シャッフルと割り当て
-            let shuffledRoles = [...roles].sort(() => Math.random() - 0.5);
-            players.forEach((p, i) => p.role = shuffledRoles[i] || "村人");
+            let rolesArray = [];
+            for (let [role, count] of Object.entries(roleCounts)) {
+                for (let i = 0; i < count; i++) rolesArray.push(role);
+            }
+            rolesArray.sort(() => Math.random() - 0.5);
+            players.forEach((p, i) => p.role = rolesArray[i]);
 
-            showScreen('role-confirm-screen');
-            updateConfirmScreen();
+            // 初日占い先の決定（妖狐以外のランダムな人）
+            const validDivineTargets = players.filter(p => ROLE_DEFS[p.role].divine === "市民" && p.role !== "妖狐");
+            if(validDivineTargets.length > 0) {
+                initDivinedTarget = validDivineTargets[Math.floor(Math.random() * validDivineTargets.length)];
+            }
+
+            day = 1;
+            currentPlayerIndex = 0;
+            phase = "confirm";
+            startInterlude();
         }
 
-        function updateConfirmScreen() {
-            document.getElementById('current-player-display').textContent = `${players[currentIndex].name} さん`;
+        // --- 端末受け渡し（インターリュード） ---
+        function startInterlude() {
+            const p = players[currentPlayerIndex];
+            if (!p.alive) {
+                nextPlayerLogic();
+                return;
+            }
+            document.getElementById('interlude-text').textContent = `今からあなたの正体を確認します。あなたは ${p.name} ですか？`;
+            showScreen('interlude-screen');
         }
 
-        function showRole() {
-            const p = players[currentIndex];
-            document.getElementById('role-display').textContent = `あなたは【${p.role}】です`;
-            document.getElementById('role-desc').textContent = 
-                p.role === '人狼' ? '仲間に気づかれないように村人を襲撃しましょう。' : 
-                p.role === '占い師' ? '毎晩、誰か一人の正体を占えます。' : '話し合いで人狼を見つけ出しましょう。';
-            showScreen('role-reveal-screen');
-        }
-
-        function nextPlayer() {
-            currentIndex++;
-            if (currentIndex < players.length) {
-                showScreen('role-confirm-screen');
-                updateConfirmScreen();
-            } else {
-                startPhase("夜");
+        function showRoleOrAction() {
+            if (phase === "confirm") {
+                showRoleConfirm();
+            } else if (phase === "vote") {
+                showVoteIndiv();
+            } else if (phase === "night") {
+                showNightAction();
             }
         }
 
-        function startPhase(phase) {
-            showScreen('action-screen');
-            document.getElementById('phase-title').textContent = `${phase}のフェーズ`;
-            // 本来はここで襲撃先選択などのロジックを入れる
-            document.getElementById('action-log').textContent = phase === "夜" ? "目を閉じてください..." : "話し合いを始めてください。";
+        // --- 役職確認 (初日) ---
+        function showRoleConfirm() {
+            clearInterval(timerInterval);
+            const p = players[currentPlayerIndex];
+            document.getElementById('role-display').textContent = `あなたは【${p.role}】です`;
+            
+            let infoText = "";
+            const wolves = players.filter(pl => pl.role === "人狼").map(pl => pl.name).join(", ");
+            const foxes = players.filter(pl => pl.role === "妖狐").map(pl => pl.name).join(", ");
+
+            if (p.role === "人狼") infoText = `仲間の人狼: ${wolves || "なし"}`;
+            if (p.role === "狂信者") infoText = `人狼は: ${wolves || "なし"} です`;
+            if (p.role === "妖狐" && players.filter(pl=>pl.role==="妖狐").length > 1) infoText = `仲間の妖狐: ${foxes}`;
+            if (p.role === "占い師" && initDivinedTarget) infoText = `初日の占い結果: ${initDivinedTarget.name} は市民です`;
+
+            document.getElementById('role-info').textContent = infoText;
+            document.getElementById('junai-action').classList.add('hidden');
+
+            if (p.role === "純愛者") {
+                document.getElementById('junai-action').classList.remove('hidden');
+                const sel = document.getElementById('junai-target');
+                sel.innerHTML = '';
+                players.filter(pl => pl.name !== p.name).forEach(pl => {
+                    sel.innerHTML += `<option value="${pl.name}">${pl.name}</option>`;
+                });
+            }
+
+            confirmTimeLeft = 15;
+            document.getElementById('confirm-timer').textContent = confirmTimeLeft;
+            showScreen('role-confirm-screen');
+
+            timerInterval = setInterval(() => {
+                confirmTimeLeft--;
+                document.getElementById('confirm-timer').textContent = confirmTimeLeft;
+                if (confirmTimeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    if (p.role === "純愛者" && !p.lovedBy) {
+                        // ランダム決定
+                        const others = players.filter(pl => pl.name !== p.name);
+                        const target = others[Math.floor(Math.random() * others.length)];
+                        p.lovedBy = target.name;
+                        document.getElementById('role-info').textContent = `時間切れ。愛する人はランダムで ${target.name} に決定しました。`;
+                        document.getElementById('junai-action').classList.add('hidden');
+                        setTimeout(nextPlayerConfirm, 5000); // 5秒表示
+                    } else {
+                        nextPlayerConfirm();
+                    }
+                }
+            }, 1000);
         }
 
-        function showScreen(id) {
-            ['setup-screen', 'role-confirm-screen', 'role-reveal-screen', 'action-screen'].forEach(s => {
-                document.getElementById(s).classList.add('hidden');
+        function decideJunai() {
+            const p = players[currentPlayerIndex];
+            p.lovedBy = document.getElementById('junai-target').value;
+            document.getElementById('role-info').textContent = `愛する人を ${p.lovedBy} に決定しました。`;
+            document.getElementById('junai-action').classList.add('hidden');
+        }
+
+        function nextPlayerConfirm() {
+            clearInterval(timerInterval);
+            nextPlayerLogic();
+        }
+
+        // --- フェーズ進行制御 ---
+        function nextPlayerLogic() {
+            currentPlayerIndex++;
+            if (currentPlayerIndex < players.length) {
+                startInterlude();
+            } else {
+                if (phase === "confirm") {
+                    // 1日目の夜 (モブ爺演出)
+                    alert("1日目の夜が訪れました... モブ爺が襲撃されました。");
+                    day++;
+                    startDayDiscuss();
+                } else if (phase === "vote") {
+                    aggregateVotes();
+                } else if (phase === "night") {
+                    resolveNight();
+                }
+            }
+        }
+
+        // --- 昼の議論 ---
+        function startDayDiscuss(morningNews = "") {
+            phase = "discuss";
+            discussTimeLeft = 300;
+            extendLeft = 5;
+            document.getElementById('day-title').textContent = `${day}日目の昼`;
+            document.getElementById('btn-extend').textContent = `延長 (+120秒) 残り5回`;
+            document.getElementById('btn-extend').disabled = false;
+            
+            // パン屋判定
+            let bakeryMsg = "";
+            const isBakeryAlive = players.some(p => p.role === "パン屋" && p.alive);
+            if (day > 1) {
+                if (isBakeryAlive) bakeryMsg = "🍞 今朝も美味しいパンが焼けました。";
+                else if (bakeryAliveLastNight && !isBakeryAlive) bakeryMsg = "🍞 パン屋が死んだため、パンは届きませんでした...";
+            }
+            bakeryAliveLastNight = isBakeryAlive;
+
+            document.getElementById('morning-news').innerHTML = morningNews + "<br>" + bakeryMsg;
+            showScreen('day-discuss-screen');
+
+            clearInterval(timerInterval);
+            document.getElementById('discuss-timer-display').textContent = discussTimeLeft;
+            timerInterval = setInterval(() => {
+                discussTimeLeft--;
+                document.getElementById('discuss-timer-display').textContent = discussTimeLeft;
+                if (discussTimeLeft <= 0) clearInterval(timerInterval);
+            }, 1000);
+        }
+
+        function extendTime() {
+            if (extendLeft > 0) {
+                discussTimeLeft += 120;
+                extendLeft--;
+                document.getElementById('btn-extend').textContent = `延長 (+120秒) 残り${extendLeft}回`;
+                if (extendLeft === 0) document.getElementById('btn-extend').disabled = true;
+            }
+        }
+
+        function endDiscussion() {
+            clearInterval(timerInterval);
+            showScreen('vote-select-screen');
+        }
+
+        // --- 投票 ---
+        function startVote(type) {
+            phase = "vote";
+            votes = {};
+            const alives = players.filter(p => p.alive);
+            
+            if (type === 'all') {
+                const sel = document.getElementById('vote-all-target');
+                sel.innerHTML = '';
+                alives.forEach(p => sel.innerHTML += `<option value="${p.name}">${p.name}</option>`);
+                showScreen('vote-all-screen');
+            } else {
+                currentPlayerIndex = 0;
+                startInterlude();
+            }
+        }
+
+        function executeVoteAll() {
+            const targetName = document.getElementById('vote-all-target').value;
+            executePlayer(targetName);
+        }
+
+        function showVoteIndiv() {
+            const p = players[currentPlayerIndex];
+            document.getElementById('vote-indiv-name').textContent = `${p.name} さんの投票`;
+            const sel = document.getElementById('vote-indiv-target');
+            sel.innerHTML = '';
+            players.filter(pl => pl.alive).forEach(pl => {
+                sel.innerHTML += `<option value="${pl.name}">${pl.name}</option>`;
             });
-            document.getElementById(id).classList.remove('hidden');
+            showScreen('vote-indiv-screen');
+        }
+
+        function nextVoteIndiv() {
+            const target = document.getElementById('vote-indiv-target').value;
+            votes[target] = (votes[target] || 0) + 1;
+            nextPlayerLogic();
+        }
+
+        function aggregateVotes() {
+            let maxVotes = 0;
+            let candidates = [];
+            for (let [name, count] of Object.entries(votes)) {
+                if (count > maxVotes) { maxVotes = count; candidates = [name]; }
+                else if (count === maxVotes) { candidates.push(name); }
+            }
+            // 同票はランダム
+            const executedName = candidates[Math.floor(Math.random() * candidates.length)];
+            executePlayer(executedName);
+        }
+
+        // --- 処刑処理・道連れ ---
+        function executePlayer(targetName) {
+            const target = players.find(p => p.name === targetName);
+            target.alive = false;
+            target.deadReason = "処刑";
+            executedToday = target;
+
+            let news = `【投票結果】 ${targetName} が処刑されました。<br>`;
+
+            // てるてる坊主勝利フラグ
+            if (target.role === "てるてる坊主") target.isTeruteruWon = true;
+
+            // 純愛者後追い
+            const lover = players.find(p => p.role === "純愛者" && p.lovedBy === target.name && p.alive);
+            if (lover) {
+                lover.alive = false;
+                lover.deadReason = "後追い";
+                news += `※誰かが後を追って死亡しました。<br>`;
+            }
+
+            // 猫又道連れ（ランダム生存者）
+            if (target.role === "猫又") {
+                const alives = players.filter(p => p.alive);
+                if (alives.length > 0) {
+                    const victim = alives[Math.floor(Math.random() * alives.length)];
+                    victim.alive = false; victim.deadReason = "道連れ";
+                    news += `※誰かが道連れになりました。<br>`;
+                }
+            }
+            // 黒猫道連れ（人狼以外のランダム生存者）
+            if (target.role === "黒猫") {
+                const alives = players.filter(p => p.alive && p.role !== "人狼");
+                if (alives.length > 0) {
+                    const victim = alives[Math.floor(Math.random() * alives.length)];
+                    victim.alive = false; victim.deadReason = "道連れ";
+                    news += `※誰かが道連れになりました。<br>`;
+                }
+            }
+
+            if (checkWinCondition()) return;
+
+            alert(news.replace(/<br>/g, "\n"));
+            startNight();
+        }
+
+        // --- 夜の行動 ---
+        function startNight() {
+            phase = "night";
+            currentPlayerIndex = 0;
+            nightActions = { attack: null, guard: null, divine: null };
+            startInterlude();
+        }
+
+        function showNightAction() {
+            const p = players[currentPlayerIndex];
+            const desc = document.getElementById('night-action-desc');
+            const sel = document.getElementById('night-action-target');
+            sel.innerHTML = '<option value="">選択しない</option>';
+            sel.classList.add('hidden');
+
+            const alives = players.filter(pl => pl.alive && pl.name !== p.name);
+
+            if (p.role === "人狼") {
+                desc.textContent = "襲撃する相手を選んでください。";
+                sel.classList.remove('hidden');
+                players.filter(pl => pl.alive && pl.role !== "人狼").forEach(pl => sel.innerHTML += `<option value="${pl.name}">${pl.name}</option>`);
+            } else if (p.role === "占い師") {
+                desc.textContent = "占う相手を選んでください。";
+                sel.classList.remove('hidden');
+                alives.forEach(pl => sel.innerHTML += `<option value="${pl.name}">${pl.name}</option>`);
+            } else if (p.role === "狩人") {
+                desc.textContent = "護衛する相手を選んでください。";
+                sel.classList.remove('hidden');
+                alives.forEach(pl => sel.innerHTML += `<option value="${pl.name}">${pl.name}</option>`);
+            } else if (p.role === "霊能者" && executedToday) {
+                const result = ROLE_DEFS[executedToday.role].divine;
+                desc.textContent = `本日の処刑者 ${executedToday.name} は【${result}】でした。`;
+            } else {
+                desc.textContent = "あなたの夜の行動はありません。少し待ってからボタンを押してください。";
+            }
+            showScreen('night-action-screen');
+        }
+
+        function nextNightAction() {
+            const p = players[currentPlayerIndex];
+            const target = document.getElementById('night-action-target').value;
+            
+            if (target) {
+                if (p.role === "人狼") nightActions.attack = target;
+                if (p.role === "占い師") nightActions.divine = target;
+                if (p.role === "狩人") nightActions.guard = target;
+            }
+
+            if (p.role === "占い師" && target) {
+                const res = ROLE_DEFS[players.find(pl => pl.name === target).role].divine;
+                alert(`占い結果: ${target} は【${res}】です。`);
+            }
+            nextPlayerLogic();
+        }
+
+        // --- 夜の解決・朝 ---
+        function resolveNight() {
+            let deaths = [];
+            
+            // 妖狐呪殺
+            if (nightActions.divine) {
+                const t = players.find(p => p.name === nightActions.divine);
+                if (t && t.role === "妖狐") {
+                    t.alive = false; t.deadReason = "呪殺";
+                    deaths.push(t.name);
+                }
+            }
+
+            // 襲撃・護衛・純愛者身代わり・猫又
+            if (nightActions.attack) {
+                const targetName = nightActions.attack;
+                if (nightActions.guard !== targetName) {
+                    let victim = players.find(p => p.name === targetName);
+                    
+                    if (victim.role !== "妖狐") {
+                        // 純愛者の身代わりチェック
+                        const lover = players.find(p => p.role === "純愛者" && p.lovedBy === victim.name && p.alive);
+                        if (lover) {
+                            victim = lover; // 身代わり
+                        }
+
+                        victim.alive = false;
+                        victim.deadReason = "襲撃";
+                        deaths.push(victim.name);
+
+                        // 襲撃されたのが猫又なら、人狼を道連れ
+                        if (victim.role === "猫又") {
+                            const aliveWolves = players.filter(p => p.role === "人狼" && p.alive);
+                            if (aliveWolves.length > 0) {
+                                const w = aliveWolves[Math.floor(Math.random() * aliveWolves.length)];
+                                w.alive = false; w.deadReason = "猫又道連れ";
+                                deaths.push(w.name);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (checkWinCondition()) return;
+
+            day++;
+            let news = `【朝の報告】<br>`;
+            if (deaths.length === 0) news += "昨晩は誰も死にませんでした。<br>";
+            else news += `無残な姿で発見されたのは... ${deaths.join(" と ")} です。<br>`;
+            
+            startDayDiscuss(news);
+        }
+
+        // --- 勝敗判定 ---
+        function checkWinCondition() {
+            let citizenCount = 0;
+            let wolfCount = 0;
+            let isFoxAlive = false;
+
+            players.filter(p => p.alive).forEach(p => {
+                const r = ROLE_DEFS[p.role];
+                if (r.count === "citizen") citizenCount++;
+                if (r.count === "wolf") wolfCount++;
+                if (p.role === "妖狐") isFoxAlive = true;
+            });
+
+            let winner = null;
+            if (wolfCount === 0) winner = isFoxAlive ? "妖狐陣営" : "市民陣営";
+            else if (wolfCount >= citizenCount) winner = isFoxAlive ? "妖狐陣営" : "人狼陣営";
+
+            if (winner) {
+                endGame(winner);
+                return true;
+            }
+            return false;
+        }
+
+        function endGame(mainWinner) {
+            clearInterval(timerInterval);
+            document.getElementById('winner-text').textContent = `🎉 ${mainWinner} の勝利！`;
+            
+            const extra = document.getElementById('extra-winners');
+            extra.innerHTML = '';
+            
+            // てるてる坊主追加勝利
+            const teruteru = players.find(p => p.role === "てるてる坊主");
+            if (teruteru && teruteru.isTeruteruWon) {
+                extra.innerHTML += `<li>🎭 てるてる坊主 (${teruteru.name}) も追加勝利！</li>`;
+            }
+
+            // 純愛者追加勝利
+            const junai = players.find(p => p.role === "純愛者");
+            if (junai) {
+                const lovedPlayer = players.find(p => p.name === junai.lovedBy);
+                // 愛する人の陣営が勝利陣営と同じかチェック
+                if (lovedPlayer) {
+                    let lovedTeamWin = false;
+                    const r = ROLE_DEFS[lovedPlayer.role].team;
+                    if (r === "citizen" && mainWinner === "市民陣営") lovedTeamWin = true;
+                    if (r === "wolf" && mainWinner === "人狼陣営") lovedTeamWin = true;
+                    if (r === "fox" && mainWinner === "妖狐陣営") lovedTeamWin = true;
+                    if (lovedPlayer.role === "てるてる坊主" && lovedPlayer.isTeruteruWon) lovedTeamWin = true;
+
+                    if (lovedTeamWin) {
+                        extra.innerHTML += `<li>💖 純愛者 (${junai.name}) も追加勝利！ (愛する人: ${junai.lovedBy})</li>`;
+                    }
+                }
+            }
+
+            const allRoles = document.getElementById('all-roles');
+            allRoles.innerHTML = '<h3>役職一覧</h3>' + players.map(p => {
+                let status = p.alive ? '生存' : `死亡 (${p.deadReason})`;
+                let ext = p.role === "純愛者" ? ` [愛:${p.lovedBy}]` : '';
+                return `<div>${p.name}: ${p.role} - ${status}${ext}</div>`;
+            }).join('');
+
+            showScreen('result-screen');
         }
     </script>
 </body>
