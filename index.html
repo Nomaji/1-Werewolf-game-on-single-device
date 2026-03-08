@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Werewolf - 対面人狼</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #eee; text-align: center; padding: 20px; }
+        .card { background: #333; border-radius: 10px; padding: 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        button { background: #4a90e2; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 5px; }
+        input { padding: 10px; border-radius: 5px; border: none; margin-bottom: 10px; width: 80%; }
+        ul { list-style: none; padding: 0; }
+        .hidden { display: none; }
+        .danger { background: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <h1>🐺 対面人狼</h1>
+
+    <div id="game-container" class="card">
+        <div id="setup-screen">
+            <h3>プレイヤー登録</h3>
+            <input type="text" id="player-name" placeholder="名前を入力">
+            <button onclick="addPlayer()">追加</button>
+            <ul id="player-list"></ul>
+            <button onclick="startGame()" class="danger">ゲーム開始</button>
+        </div>
+
+        <div id="role-confirm-screen" class="hidden">
+            <h2 id="current-player-display"></h2>
+            <p>準備ができたらボタンを押してください</p>
+            <button onclick="showRole()">役職を見る</button>
+        </div>
+
+        <div id="role-reveal-screen" class="hidden">
+            <h2 id="role-display"></h2>
+            <p id="role-desc"></p>
+            <button onclick="nextPlayer()">確認しました</button>
+        </div>
+
+        <div id="action-screen" class="hidden">
+            <h2 id="phase-title">夜のフェーズ</h2>
+            <div id="action-log"></div>
+            <button onclick="endTurn()" id="phase-btn">次の日へ</button>
+        </div>
+    </div>
+
+    <script>
+        let players = [];
+        let currentIndex = 0;
+        const roles = ["人狼", "占い師", "村人", "村人", "村人"]; // 人数に合わせて調整
+
+        function addPlayer() {
+            const input = document.getElementById('player-name');
+            if (input.value) {
+                players.push({ name: input.value, role: '', alive: true });
+                const li = document.createElement('li');
+                li.textContent = input.value;
+                document.getElementById('player-list').appendChild(li);
+                input.value = '';
+            }
+        }
+
+        function startGame() {
+            if (players.length < 3) return alert("3人以上必要です");
+            
+            // 役職シャッフルと割り当て
+            let shuffledRoles = [...roles].sort(() => Math.random() - 0.5);
+            players.forEach((p, i) => p.role = shuffledRoles[i] || "村人");
+
+            showScreen('role-confirm-screen');
+            updateConfirmScreen();
+        }
+
+        function updateConfirmScreen() {
+            document.getElementById('current-player-display').textContent = `${players[currentIndex].name} さん`;
+        }
+
+        function showRole() {
+            const p = players[currentIndex];
+            document.getElementById('role-display').textContent = `あなたは【${p.role}】です`;
+            document.getElementById('role-desc').textContent = 
+                p.role === '人狼' ? '仲間に気づかれないように村人を襲撃しましょう。' : 
+                p.role === '占い師' ? '毎晩、誰か一人の正体を占えます。' : '話し合いで人狼を見つけ出しましょう。';
+            showScreen('role-reveal-screen');
+        }
+
+        function nextPlayer() {
+            currentIndex++;
+            if (currentIndex < players.length) {
+                showScreen('role-confirm-screen');
+                updateConfirmScreen();
+            } else {
+                startPhase("夜");
+            }
+        }
+
+        function startPhase(phase) {
+            showScreen('action-screen');
+            document.getElementById('phase-title').textContent = `${phase}のフェーズ`;
+            // 本来はここで襲撃先選択などのロジックを入れる
+            document.getElementById('action-log').textContent = phase === "夜" ? "目を閉じてください..." : "話し合いを始めてください。";
+        }
+
+        function showScreen(id) {
+            ['setup-screen', 'role-confirm-screen', 'role-reveal-screen', 'action-screen'].forEach(s => {
+                document.getElementById(s).classList.add('hidden');
+            });
+            document.getElementById(id).classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
